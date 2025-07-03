@@ -1,0 +1,21 @@
+# Ignore dataset files
+data/raw/
+*.zip
+*.bin
+*.npy
+
+# Python cache and logs
+__pycache__/
+*.pyc
+*.log
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# Environment files
+.env
+
+2011_09_26_drive_0001_sync
