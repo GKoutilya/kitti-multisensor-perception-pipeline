@@ -24,13 +24,13 @@ The system also supports animation and trajectory visualization, providing a com
 
 ```
 
-/
-├── animate\_fusion.py          # Main script for animation and visualization
-├── kalman\_tracker.py          # Multi-object Kalman filter tracking implementation
-├── 2011\_09\_26\_drive\_0001\_sync/ # KITTI dataset files (images, LIDAR)
-├── 2011\_09\_26/                # KITTI calibration files
-├── label\_2/                   # KITTI label files for object detection
-├── README.md                  # This documentation file
+
+├── animate\_fusion.py                      # Main script for animation and visualization
+├── kalman\_tracker.py                      # Multi-object Kalman filter tracking implementation
+├── 2011\_09\_26\_drive\_0001\_sync/        # KITTI dataset files (images, LIDAR)
+├── 2011\_09\_26/                           # KITTI calibration files
+├── label\_2/                               # KITTI label files for object detection
+├── README.md                               # This documentation file
 
 ````
 
@@ -123,15 +123,16 @@ This project is released under the MIT License.
 
 ---
 
-## Contact
+## Author
+
+**Koutilya Ganapathiraju**  
+Machine Learning Engineer | Robotics Enthusiast  
+[GitHub](https://github.com/GKoutilya) | [LinkedIn](www.linkedin.com/in/koutilya-ganapathiraju-0a3350182) | gkoutilyaraju@gmail.com  
+
+Passionate about building cutting-edge perception and tracking systems for robotics and autonomous vehicles. Always eager to explore new AI techniques and share knowledge with the community.
 
 For questions or suggestions, feel free to reach out.
 
 ---
 
-```
-
----
-
-If you want, I can also help you write a shorter summary version or add badges and screenshots next!
 ```
