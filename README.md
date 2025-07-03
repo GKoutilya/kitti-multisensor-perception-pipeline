@@ -134,5 +134,3 @@ Passionate about building cutting-edge perception and tracking systems for robot
 For questions or suggestions, feel free to reach out.
 
 ---
-
-```
