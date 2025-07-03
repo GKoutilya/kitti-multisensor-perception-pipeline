@@ -2,10 +2,11 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
-from tracker import SimpleTracker
-import random
+from matplotlib.colors import to_rgb
+from kalman_tracker import MultiObjectTracker
 
 # ========== CONFIG ==========
 dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26_drive_0001_sync'
@@ -132,7 +133,7 @@ class FusionAnimator:
     def __init__(self, num_frames=NUM_FRAMES):
         self.num_frames = num_frames
         self.Tr_velo_to_cam, self.R_rect, self.P2 = load_calibration()
-        self.tracker = SimpleTracker(max_distance=3.0)
+        self.tracker = MultiObjectTracker()
 
         self.image_files = sorted([f for f in os.listdir(image_folder) if f.endswith('.png')])[:num_frames]
         self.lidar_files = sorted([f for f in os.listdir(lidar_folder) if f.endswith('.bin')])[:num_frames]
@@ -161,6 +162,23 @@ class FusionAnimator:
             # Generate a random bright color (BGR) for OpenCV
             self.colors[obj_id] = tuple(np.random.choice(range(50,256), size=3).tolist())
         return self.colors[obj_id]
+    
+    def get_color(self, track_id):
+        """
+        Assign a consistent color to each track ID using a colormap.
+
+        Args:
+            track_id (int): Object ID
+
+        Returns:
+            tuple: RGB color in [0,255] format
+        """
+        if track_id not in self.colors:
+            cmap = colormaps['tab20']
+            color = cmap(track_id % 20)[:3]  # RGB in 0–1
+            self.colors[track_id] = tuple(int(255 * c) for c in color)
+        return self.colors[track_id]
+
 
     def toggle_pause(self, event):
         """Toggle pause/play state of animation."""
@@ -189,27 +207,28 @@ class FusionAnimator:
         tracked = self.tracker.update(centroids)
 
         # Draw 3D boxes and tracking info
-        for obj, track in zip(objects, tracked):
-            corners_3d = compute_3d_box(obj['dimensions'], obj['location'], obj['rotation_y'])
-            corners_2d = project_to_image(corners_3d, self.P2)
-            color = self._get_color(track['id'])
+        for track in tracked:
+            track_id = track.track_id
+            state = track.get_state()
+            if state is None:
+                continue
+            cx, cy, cz = state[:3]
+            color = self.get_color(track_id)
 
-            # Draw bounding box in RGB image (convert BGR->RGB for matplotlib display)
+            # Find associated object for bounding box rendering
+            closest_obj = min(objects, key=lambda o: np.linalg.norm(np.array(o['location']) - state[:3]))
+            corners_3d = compute_3d_box(closest_obj['dimensions'], [cx, cy, cz], closest_obj['rotation_y'])
+            corners_2d = project_to_image(corners_3d, self.P2)
             draw_3d_bbox(img_rgb, corners_2d, color=color, thickness=2)
 
-            # Project centroid to 2D for text and trajectory
-            cx, cy, cz = obj['location']
+            # Draw label and trajectory
             pt_2d = project_to_image(np.array([[cx, cy, cz]]), self.P2)[0]
             pt_2d_int = (int(pt_2d[0]), int(pt_2d[1]))
+            cv2.putText(img_rgb, f'ID {track_id}', pt_2d_int, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA)
 
-            # Draw ID text near centroid
-            cv2.putText(img_rgb, f'ID {track["id"]}', pt_2d_int,
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA)
-
-            # Update trajectory points for this object ID
-            if track['id'] not in self.trajectories:
-                self.trajectories[track['id']] = []
-            self.trajectories[track['id']].append(pt_2d)
+            if track_id not in self.trajectories:
+                self.trajectories[track_id] = []
+            self.trajectories[track_id].append(pt_2d)
 
         # Draw all trajectories on img_rgb as lines
         for obj_id, points in self.trajectories.items():
