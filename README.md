@@ -127,7 +127,7 @@ This project is released under the MIT License.
 
 **Koutilya Ganapathiraju**  
 Machine Learning Engineer | Robotics Enthusiast  
-[GitHub](https://github.com/GKoutilya) | [LinkedIn](www.linkedin.com/in/koutilya-ganapathiraju-0a3350182) | gkoutilyaraju@gmail.com  
+https://github.com/GKoutilya | www.linkedin.com/in/koutilya-ganapathiraju-0a3350182 | gkoutilyaraju@gmail.com  
 
 Passionate about building cutting-edge perception and tracking systems for robotics and autonomous vehicles. Always eager to explore new AI techniques and share knowledge with the community.
 
