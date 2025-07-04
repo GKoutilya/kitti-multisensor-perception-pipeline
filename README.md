@@ -164,9 +164,9 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 I am passionate about robotics, autonomous vehicles, and AI-powered perception systems. This project reflects my deep expertise in sensor fusion, tracking algorithms, and LLM integration for explainability.
 
 **Contact Me:**  
-- GitHub: [GitHub](https://github.com/GKoutilya)  
-- LinkedIn: [LinkedIn](https://www.linkedin.com/in/koutilya-ganapathiraju-0a3350182/)  
-- Email: gkoutilyaraju@gmail.com
+- [GitHub](https://github.com/GKoutilya)  
+- [LinkedIn](https://www.linkedin.com/in/koutilya-ganapathiraju-0a3350182/)  
+- [Email](gkoutilyaraju@gmail.com)
 
 Feel free to reach out if you want to discuss collaborations or technical questions!
 
