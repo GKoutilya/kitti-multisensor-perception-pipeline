@@ -428,7 +428,7 @@ class FusionAnimator:
             filename (str): Filename for the saved GIF.
         """
         print(f"Saving animation to {filename} ...")
-        self.anim.save(filename, writer='pillow', fps=10)
+        self.anim.save(filename, writer='pillow', fps=3)
         print("Animation saved.")
 
 def main():
