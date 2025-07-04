@@ -15,6 +15,7 @@ This advanced **Multisensor Fusion & Real-Time 3D Object Tracking** pipeline lev
 - **Persistent object tracking** using a custom Kalman Filter-based multi-object tracker.
 - **Dynamic 3D bounding boxes** projected onto 2D images, color-coded per tracked ID.
 - **Natural language scene summaries** generated live via OpenAI GPT-3.5 Turbo — describing traffic behavior frame-by-frame.
+- **Directional trajectory arrows** that visualize object motion between frames.
 - **Rich visual outputs** including GIF animations of tracking and a detailed trajectory summary image.
 - Designed for **real-time performance** with downsampling and efficient data handling.
 
@@ -27,9 +28,11 @@ This project is a showcase of state-of-the-art robotics perception, sensor fusio
 - **Multi-Modal Sensor Fusion:** Align and combine LiDAR point clouds with camera images using KITTI calibration data.
 - **3D Bounding Box Computation:** Accurate spatial representation of detected objects with rotation-aware 3D boxes.
 - **Kalman Filter Multi-Object Tracking:** Maintain consistent IDs over frames despite occlusion and noise.
+- **Trajectory Direction Arrows:** Visual indicators of object movement direction between consecutive frames.
 - **OpenAI GPT-3.5 Turbo Integration:** Contextual, concise scene summaries enhance interpretability and explainability.
 - **Intuitive Visualization:** Side-by-side matplotlib animation with pause/play controls and well-structured UI.
 - **Exportable Results:** Save high-quality GIF animations and trajectory summary snapshots for analysis and presentations.
+- **Comprehensive Docstrings:** Fully documented functions and classes for maintainability and clarity.
 
 ---
 
@@ -115,11 +118,17 @@ python animate_fusion.py
 * **3D Bounding Boxes:**
   Object dimensions, locations, and yaw rotations from KITTI labels are used to compute accurate 3D box corners, projected into the image frame.
 
+* **Trajectory Arrows:**
+  Directional arrows are drawn between consecutive positions in the image plane to intuitively show the movement direction of tracked objects.
+
 * **Scene Summarization:**
   The OpenAI GPT-3.5 Turbo model receives current tracked objects and outputs a concise human-readable summary of traffic flow and object states, updated every frame.
 
 * **Visualization:**
   Built with matplotlib’s `FuncAnimation` and interactive widgets for user-friendly control.
+
+* **Documentation:**
+  All key functions and classes are documented with detailed docstrings to ensure clarity and maintainability.
 
 ---
 
