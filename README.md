@@ -165,7 +165,7 @@ I am passionate about robotics, autonomous vehicles, and AI-powered perception s
 
 **Contact Me:**  
 - GitHub: [GitHub](https://github.com/GKoutilya)  
-- LinkedIn: [LinkedIn](www.linkedin.com/in/koutilya-ganapathiraju-0a3350182)  
+- LinkedIn: [LinkedIn](https://www.linkedin.com/in/koutilya-ganapathiraju-0a3350182/)  
 - Email: gkoutilyaraju@gmail.com
 
 Feel free to reach out if you want to discuss collaborations or technical questions!
