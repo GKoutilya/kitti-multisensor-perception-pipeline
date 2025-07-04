@@ -39,6 +39,8 @@ This project is a showcase of state-of-the-art robotics perception, sensor fusio
 
 ├── animate_fusion.py                     # Main animation and visualization script
 ├── kalman_tracker.py                     # Custom Kalman filter multi-object tracking module
+├── explore_kitti.py                      # Script to explore KITTI dataset images and LiDAR
+├── bbox_visualizer.py                    # Utility to visualize 3D bounding boxes on images
 ├── README.md                             # This documentation file
 ├── label_2/                              # KITTI label files for object annotations
 ├── 2011_09_26_drive_0001_sync/           # KITTI dataset folder (images & LiDAR)
