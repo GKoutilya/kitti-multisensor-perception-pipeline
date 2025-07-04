@@ -40,7 +40,6 @@ This project is a showcase of state-of-the-art robotics perception, sensor fusio
 ├── animate_fusion.py                     # Main animation and visualization script
 ├── kalman_tracker.py                     # Custom Kalman filter multi-object tracking module
 ├── README.md                             # This documentation file
-├── requirements.txt                      # Python dependencies
 ├── label_2/                              # KITTI label files for object annotations
 ├── 2011_09_26_drive_0001_sync/           # KITTI dataset folder (images & LiDAR)
 └── 2011_09_26/                           # KITTI calibration files
