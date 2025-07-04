@@ -8,10 +8,10 @@ dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Obj
 calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26'
 
 image_folder = os.path.join(dataset_path, 'image_02', 'data')
-label_folder = os.path.join(os.path.dirname(__file__), 'label_2')  # Adjust if label folder is elsewhere
+label_folder = os.path.join(os.path.dirname(__file__), 'label_2')
 
 def read_calib_file(filepath):
-    """Parse KITTI calibration file into dictionary of numpy arrays."""
+    """Same as before - parse KITTI calibration into numpy arrays"""
     data = {}
     with open(filepath, 'r') as f:
         for line in f:
@@ -20,12 +20,11 @@ def read_calib_file(filepath):
                 try:
                     data[key.strip()] = np.array([float(x) for x in value.strip().split()])
                 except ValueError:
-                    # Some lines like dates or comments might fail, ignore those
                     continue
     return data
 
 def load_calibration():
-    """Load necessary calibration matrices."""
+    """Load calibration matrices (Tr_velo_to_cam, R_rect, P2) same as before"""
     velo_calib = read_calib_file(os.path.join(calib_path, 'calib_velo_to_cam.txt'))
     cam_calib = read_calib_file(os.path.join(calib_path, 'calib_cam_to_cam.txt'))
 
@@ -51,7 +50,7 @@ def parse_label_file(label_path):
         label_path (str): Path to label text file.
 
     Returns:
-        List of dicts with keys: type, truncated, occluded, alpha, bbox, dimensions, location, rotation_y
+        list of dicts with keys: type, truncated, occluded, alpha, bbox (2D), dimensions (h,w,l), location (x,y,z), rotation_y
     """
     objects = []
     with open(label_path, 'r') as f:
@@ -62,9 +61,9 @@ def parse_label_file(label_path):
                 'truncated': float(parts[1]),
                 'occluded': int(parts[2]),
                 'alpha': float(parts[3]),
-                'bbox': [float(x) for x in parts[4:8]],
-                'dimensions': [float(x) for x in parts[8:11]],
-                'location': [float(x) for x in parts[11:14]],
+                'bbox': [float(x) for x in parts[4:8]],        # 2D bbox in pixels: left, top, right, bottom
+                'dimensions': [float(x) for x in parts[8:11]], # height, width, length in meters
+                'location': [float(x) for x in parts[11:14]],  # x,y,z in camera coords
                 'rotation_y': float(parts[14])
             }
             objects.append(obj)
@@ -72,27 +71,27 @@ def parse_label_file(label_path):
 
 def compute_3d_box(dimensions, location, rotation_y):
     """
-    Compute 8 corners of the 3D bounding box in camera coordinates.
+    Compute 8 corners of 3D bounding box in camera coordinate system.
 
     Args:
         dimensions (list): [height, width, length]
         location (list): [x, y, z]
-        rotation_y (float): rotation around Y axis.
+        rotation_y (float): rotation around Y axis in camera coords.
 
     Returns:
-        numpy array: 8 corners (8x3)
+        numpy array: 8x3 corners of 3D box
     """
     h, w, l = dimensions
     x, y, z = location
 
-    # Object coordinate corners
+    # Create box corners in object frame
     x_corners = [l/2, l/2, -l/2, -l/2, l/2, l/2, -l/2, -l/2]
     y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
     z_corners = [w/2, -w/2, -w/2, w/2, w/2, -w/2, -w/2, w/2]
 
     corners = np.vstack([x_corners, y_corners, z_corners])
 
-    # Rotation matrix
+    # Rotation matrix around Y axis
     R = np.array([
         [np.cos(rotation_y), 0, np.sin(rotation_y)],
         [0, 1, 0],
@@ -106,14 +105,14 @@ def compute_3d_box(dimensions, location, rotation_y):
 
 def project_to_image(pts_3d, P):
     """
-    Project 3D points to 2D image.
+    Project 3D points to 2D image plane.
 
     Args:
-        pts_3d (numpy array): Nx3 points
-        P (numpy array): 3x4 projection matrix
+        pts_3d (numpy array): Nx3 3D points in camera coords.
+        P (numpy array): 3x4 projection matrix.
 
     Returns:
-        Nx2 array of pixel coordinates
+        Nx2 numpy array of 2D pixel coordinates.
     """
     n = pts_3d.shape[0]
     pts_3d_hom = np.hstack((pts_3d, np.ones((n, 1))))
@@ -123,28 +122,31 @@ def project_to_image(pts_3d, P):
 
 def draw_3d_bbox(img, corners, color=(0, 255, 0), thickness=2):
     """
-    Draw 3D bounding box edges on image.
+    Draw 3D bounding box on image.
 
     Args:
-        img (np.array): image
-        corners (numpy array): 8x2 corners projected
-        color (tuple): BGR color
-        thickness (int): line thickness
+        img (np.array): Image to draw on.
+        corners (numpy array): 8x2 projected 2D corners.
+        color (tuple): Color in BGR.
+        thickness (int): Line thickness.
     """
     corners = corners.astype(np.int32)
+    # Draw lines between the 8 corners to form the box
     # Bottom rectangle
-    for i, j in zip([0,1,2,3], [1,2,3,0]):
+    for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
         cv2.line(img, tuple(corners[i]), tuple(corners[j]), color, thickness)
     # Top rectangle
-    for i, j in zip([4,5,6,7], [5,6,7,4]):
+    for i, j in zip([4, 5, 6, 7], [5, 6, 7, 4]):
         cv2.line(img, tuple(corners[i]), tuple(corners[j]), color, thickness)
-    # Vertical edges
-    for i, j in zip(range(4), range(4,8)):
+    # Vertical lines
+    for i, j in zip(range(4), range(4, 8)):
         cv2.line(img, tuple(corners[i]), tuple(corners[j]), color, thickness)
 
 def main():
+    # Load calibration matrices
     Tr_velo_to_cam, R_rect, P2 = load_calibration()
 
+    # Frame index to visualize
     frame_idx = 0
     image_file = sorted(os.listdir(image_folder))[frame_idx]
     label_file = sorted(os.listdir(label_folder))[frame_idx]
@@ -157,8 +159,10 @@ def main():
 
     objects = parse_label_file(lbl_path)
 
+    # Draw 3D bounding boxes
     for obj in objects:
         corners_3d = compute_3d_box(obj['dimensions'], obj['location'], obj['rotation_y'])
+        # Project corners to image plane
         corners_2d = project_to_image(corners_3d, P2)
         draw_3d_bbox(img_rgb, corners_2d)
 
