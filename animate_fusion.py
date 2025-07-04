@@ -24,6 +24,8 @@ NUM_FRAMES = 25
 LIDAR_DOWNSAMPLE = 5
 POINT_SIZE = 1.5
 
+final_summary_prompt = []
+
 def read_calib_file(filepath):
     """
     Read KITTI calibration text file and parse into dict of numpy arrays.
@@ -85,15 +87,15 @@ def project_lidar_to_image(scan, Tr_velo_to_cam, R_rect, P2, color_by='depth'):
             colors (np.ndarray): Color values for each point.
     """
     scan = scan[::LIDAR_DOWNSAMPLE]
-    scan = scan[scan[:, 0] > 0]  # Remove points behind sensor
+    scan = scan[scan[:, 0] > 0]
 
-    lidar_hom = np.hstack((scan[:, :3], np.ones((scan.shape[0], 1))))  # Homogeneous coords (N x 4)
-    pts_cam = (Tr_velo_to_cam @ lidar_hom.T).T  # Transform to camera coords
-    pts_rect = (R_rect @ pts_cam.T).T  # Rectify points
-    pts_rect = pts_rect[pts_rect[:, 2] > 0]  # Keep points in front of camera
+    lidar_hom = np.hstack((scan[:, :3], np.ones((scan.shape[0], 1))))
+    pts_cam = (Tr_velo_to_cam @ lidar_hom.T).T
+    pts_rect = (R_rect @ pts_cam.T).T
+    pts_rect = pts_rect[pts_rect[:, 2] > 0]
 
-    pts_2d = (P2 @ pts_rect.T).T  # Project to 2D image plane (N x 3)
-    pts_2d = pts_2d[:, :2] / pts_2d[:, 2, np.newaxis]  # Normalize by depth
+    pts_2d = (P2 @ pts_rect.T).T
+    pts_2d = pts_2d[:, :2] / pts_2d[:, 2, np.newaxis]
 
     colors = scan[:, 3] if color_by == 'intensity' else pts_rect[:, 2]
 
@@ -142,13 +144,11 @@ def compute_3d_box(dimensions, location, rotation_y):
     h, w, l = dimensions
     x, y, z = location
 
-    # 3D bounding box corners relative to object center
     x_corners = [l/2, l/2, -l/2, -l/2, l/2, l/2, -l/2, -l/2]
     y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
     z_corners = [w/2, -w/2, -w/2, w/2, w/2, -w/2, -w/2, w/2]
     corners = np.vstack([x_corners, y_corners, z_corners])
 
-    # Rotation matrix around Y axis
     R = np.array([
         [np.cos(rotation_y), 0, np.sin(rotation_y)],
         [0, 1, 0],
@@ -157,7 +157,7 @@ def compute_3d_box(dimensions, location, rotation_y):
 
     corners_rot = R @ corners
     corners_3d = corners_rot + np.array([[x], [y], [z]])
-    return corners_3d.T  # Shape (8,3)
+    return corners_3d.T
 
 def project_to_image(pts_3d, P):
     """
@@ -219,46 +219,28 @@ def generate_scene_summary(objects, tracked):
         return f"(LLM error: {e})"
 
 class FusionAnimator:
-    """
-    Class that animates the KITTI sensor fusion pipeline with 3D bounding boxes,
-    persistent multi-object tracking via Kalman filter, and GPT-based dynamic scene summaries.
-
-    Features:
-    - Left panel: color camera frame overlaid with projected LiDAR points, 3D bounding boxes, and track IDs.
-    - Right panel: live natural language summary of scene via OpenAI GPT.
-    - Pause/play button below summary.
-    - Saves trajectory summary image with object paths and IDs.
-    - Saves GIF animation of the sequence.
+    """Main class responsible for fusing KITTI data streams and animating the visualization.
 
     Attributes:
-        num_frames (int): Number of frames to animate.
-        Tr_velo_to_cam (np.ndarray): Velodyne to camera transform matrix.
-        R_rect (np.ndarray): Rectification matrix.
-        P2 (np.ndarray): Projection matrix for left color camera.
-        tracker (MultiObjectTracker): Kalman filter multi-object tracker instance.
-        image_files (list): Sorted list of color image filenames.
-        lidar_files (list): Sorted list of LiDAR binary files.
-        label_files (list): Sorted list of label text files.
-        fig (matplotlib.figure.Figure): Figure for animation.
-        ax_img (matplotlib.axes.Axes): Axis for image display.
-        ax_text (matplotlib.axes.Axes): Axis for summary text.
-        img_display (matplotlib.image.AxesImage): Image display handle.
-        scatter (matplotlib.collections.PathCollection): Scatter plot for LiDAR points.
-        text_handle (matplotlib.text.Text): Text handle for summary.
-        colors (dict): Mapping of track_id to RGB color.
-        trajectories (dict): Track ID to list of 2D trajectory points.
-        paused (bool): Pause state of animation.
-        btn_pause (matplotlib.widgets.Button): Button to pause/play.
-        anim (matplotlib.animation.FuncAnimation): Animation instance.
+        num_frames (int): Total number of frames to animate.
+        tracker (MultiObjectTracker): Kalman-based object tracker.
+        image_files (list): List of image file paths.
+        lidar_files (list): List of LiDAR scan file paths.
+        label_files (list): List of annotation label file paths.
+        fig (plt.Figure): Matplotlib figure handle.
+        ax_img (plt.Axes): Axis for camera view.
+        ax_text (plt.Axes): Axis for GPT summary.
+        img_display (plt.Artist): Image artist for frame updates.
+        scatter (plt.Artist): Scatter artist for LiDAR points.
+        text_handle (plt.Text): Text handle for GPT summary.
+        paused (bool): Animation pause state.
+        colors (dict): Track ID to RGB mapping.
+        trajectories (dict): Object trajectories.
+        anim (FuncAnimation): Animation controller.
     """
 
     def __init__(self, num_frames=NUM_FRAMES):
-        """
-        Initialize the FusionAnimator with configuration, data paths, and matplotlib setup.
-
-        Args:
-            num_frames (int): Number of frames to animate.
-        """
+        """Initializes the FusionAnimator and sets up matplotlib and data paths."""
         self.num_frames = num_frames
         self.Tr_velo_to_cam, self.R_rect, self.P2 = load_calibration()
         self.tracker = MultiObjectTracker()
@@ -267,29 +249,17 @@ class FusionAnimator:
         self.lidar_files = sorted([f for f in os.listdir(lidar_folder) if f.endswith('.bin')])[:self.num_frames]
         self.label_files = sorted([f for f in os.listdir(label_folder) if f.endswith('.txt')])[:self.num_frames]
 
-        # Create figure with side-by-side subplots (image + summary text)
-        self.fig, (self.ax_img, self.ax_text) = plt.subplots(1, 2, figsize=(15, 7),
-                                                             gridspec_kw={'width_ratios': [3, 1]})
-
-        # Initialize left axis for image + LiDAR scatter
+        self.fig, (self.ax_img, self.ax_text) = plt.subplots(1, 2, figsize=(15, 7), gridspec_kw={'width_ratios': [3, 1]})
         self.img_display = self.ax_img.imshow(np.zeros((375, 1242, 3), dtype=np.uint8))
         self.scatter = self.ax_img.scatter([], [], s=POINT_SIZE, c=[], cmap='jet', alpha=0.8)
         self.ax_img.axis('off')
         self.ax_img.set_title('KITTI Sensor Fusion with 3D Bounding Boxes & Object Tracking')
 
-        # Initialize right axis for summary text
         self.ax_text.axis('off')
-        self.text_handle = self.ax_text.text(
-            0.5, 0.5, "",
-            ha='center', va='center',
-            fontsize=10,
-            wrap=True,
-            fontfamily='monospace',
-            linespacing=1.2,
-            bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5')
-        )
+        self.text_handle = self.ax_text.text(0.5, 0.5, "", ha='center', va='center', fontsize=10, wrap=True,
+                                             fontfamily='monospace', linespacing=1.2,
+                                             bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
 
-        # Pause/play button below right panel
         btn_ax = plt.axes([0.81, 0.01, 0.1, 0.05])
         self.btn_pause = Button(btn_ax, 'Pause')
         self.btn_pause.on_clicked(self.toggle_pause)
@@ -297,83 +267,66 @@ class FusionAnimator:
 
         self.colors = {}
         self.trajectories = {}
-
-        # Create animation object
         self.anim = FuncAnimation(self.fig, self.update, frames=self.num_frames, interval=100, blit=False)
 
     def toggle_pause(self, event):
-        """
-        Toggle the paused state of the animation and update button label.
-
-        Args:
-            event: Mouse click event (ignored).
-        """
+        """Toggle play/pause state of the animation."""
         self.paused = not self.paused
         self.btn_pause.label.set_text('Play' if self.paused else 'Pause')
 
     def get_color(self, track_id):
-        """
-        Assign or retrieve consistent RGB color for each track ID.
+        """Returns consistent RGB color for a given track ID.
 
         Args:
-            track_id (int): Track ID number.
-
+            track_id (int): Object track ID.
         Returns:
-            tuple: RGB color tuple as integers (0-255).
+            tuple: RGB tuple.
         """
         if track_id not in self.colors:
             cmap = colormaps['tab20']
-            color = cmap(track_id % 20)[:3]  # RGB floats 0-1
+            color = cmap(track_id % 20)[:3]
             self.colors[track_id] = tuple(int(255 * c) for c in color)
         return self.colors[track_id]
 
     def update(self, frame_idx):
-        """
-        Update the animation frame: load data, update tracking, draw bounding boxes and summary.
+        """Update function for animation; processes a single frame.
 
         Args:
-            frame_idx (int): Index of current animation frame.
-
+            frame_idx (int): Index of current frame.
         Returns:
-            tuple: Updated matplotlib artists.
+            tuple: Updated artists.
         """
         if self.paused:
             return self.img_display, self.scatter, self.text_handle
 
-        # Load camera image and convert to RGB
         img = cv2.imread(os.path.join(image_folder, self.image_files[frame_idx]))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Load LiDAR scan and project to image plane
         scan = np.fromfile(os.path.join(lidar_folder, self.lidar_files[frame_idx]), dtype=np.float32).reshape(-1, 4)
         pts_2d, colors = project_lidar_to_image(scan, self.Tr_velo_to_cam, self.R_rect, self.P2, color_by='intensity')
 
-        # Load and parse label file for detected objects
         label_path = os.path.join(label_folder, self.label_files[frame_idx])
         objects = parse_label_file(label_path)
 
-        # Extract 3D centroids from objects for tracking
         centroids = [obj['location'] for obj in objects]
         tracked = self.tracker.update(centroids)
 
-        # Update trajectories and assign colors
         for track in tracked:
             track_id = track.track_id
             state = track.get_state()
             if state is None:
                 continue
+
             pos_3d = state[:3]
             pts_proj = project_to_image(np.array([pos_3d]), self.P2)
             pos_2d = (int(pts_proj[0, 0]), int(pts_proj[0, 1]))
             self.trajectories.setdefault(track_id, []).append(pos_2d)
             self.get_color(track_id)
 
-        # Update displayed image and LiDAR scatter points
         self.img_display.set_data(img_rgb)
         self.scatter.set_offsets(pts_2d)
         self.scatter.set_array(colors)
 
-        # Draw 3D bounding boxes and IDs on image using OpenCV
         for obj, track in zip(objects, tracked):
             corners_3d = compute_3d_box(obj['dimensions'], obj['location'], obj['rotation_y'])
             pts_box = project_to_image(corners_3d, self.P2).astype(int)
@@ -388,10 +341,19 @@ class FusionAnimator:
             cv2.putText(img_rgb, f'ID {track.track_id}', (x_min, max(y_min - 10, 15)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
 
-        # Set updated image to display
-        self.img_display.set_data(img_rgb)
+            if len(self.trajectories[track.track_id]) > 1:
+                start_pt = tuple(self.trajectories[track.track_id][-2])
+                end_pt = pos_2d
+                cv2.arrowedLine(img_rgb, start_pt, end_pt,
+                                self.get_color(track.track_id), 2, tipLength=0.3)
 
-        # Generate and display GPT scene summary text
+            velocity = np.linalg.norm(track.get_state()[3:6])
+            cv2.putText(img_rgb, f'v={velocity:.1f} m/s', (x_min, y_min + 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
+
+            final_summary_prompt.append((track.track_id, track.get_state()))
+
+        self.img_display.set_data(img_rgb)
         summary = generate_scene_summary(objects, tracked)
         wrapped = "\n".join(textwrap.wrap(summary, width=40))
         self.text_handle.set_text(wrapped)
@@ -399,12 +361,7 @@ class FusionAnimator:
         return self.img_display, self.scatter, self.text_handle
 
     def save_trajectory_image(self, filename='trajectory_summary.png'):
-        """
-        Save a static image visualizing object trajectories over the last frame.
-
-        Args:
-            filename (str): Filename to save the image.
-        """
+        """Save final frame image with overlaid trajectories."""
         img = cv2.imread(os.path.join(image_folder, self.image_files[-1]))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -421,24 +378,40 @@ class FusionAnimator:
         print(f"Trajectory summary image saved as {filename}")
 
     def save_animation(self, filename='fusion_tracking.gif'):
-        """
-        Save the entire animation as a GIF file.
-
-        Args:
-            filename (str): Filename for the saved GIF.
-        """
+        """Save full animation as GIF file."""
         print(f"Saving animation to {filename} ...")
-        self.anim.save(filename, writer='pillow', fps=3)
+        self.anim.save(filename, writer='pillow', fps=5)
         print("Animation saved.")
 
+def summarize_scene_delta(final_summary_prompt):
+    """Generate a final GPT summary describing how the scene evolved over time."""
+    if not final_summary_prompt:
+        return
+    lines = [f"- ID {tid}: ended at ({state[0]:.1f}, {state[1]:.1f}, {state[2]:.1f}) with v={np.linalg.norm(state[3:6]):.1f} m/s"
+             for tid, state in final_summary_prompt]
+    prompt = "Summarize how the scene evolved over the animation:\n" + "\n".join(lines)
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant summarizing scene evolution over time."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=100,
+            temperature=0.6,
+        )
+        print("\nFinal Scene Summary:")
+        print(response.choices[0].message.content.strip())
+    except Exception as e:
+        print(f"(LLM error on final summary: {e})")
+
 def main():
-    """
-    Main entry point to run the FusionAnimator visualization.
-    """
+    """Main entry point to run FusionAnimator and save outputs."""
     animator = FusionAnimator()
     plt.show()
     animator.save_animation()
     animator.save_trajectory_image()
+    summarize_scene_delta(final_summary_prompt)
 
 if __name__ == "__main__":
     main()
