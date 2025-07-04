@@ -1,136 +1,175 @@
-# Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Using KITTI Dataset
+# Multisensor Fusion & Real-Time 3D Object Tracking Pipeline Using KITTI Dataset
 
-## Project Overview
-
-This project implements a multisensor fusion and real-time 3D object tracking perception pipeline using the KITTI dataset. The pipeline fuses LIDAR and camera data to detect and track multiple objects in 3D space. It visualizes projected LIDAR points on camera images, draws 3D bounding boxes, and performs persistent multi-object tracking with a Kalman filter-based tracker.
-
-The system also supports animation and trajectory visualization, providing a comprehensive perception tool ideal for autonomous driving research, robotics, and computer vision applications.
-
----
-
-## Features
-
-- **Sensor Fusion**: Projects 3D LIDAR points onto 2D camera images using KITTI calibration data.
-- **3D Object Detection Visualization**: Parses KITTI label files to draw accurate 3D bounding boxes in the camera frame.
-- **Multi-Object Tracking**: Tracks multiple objects over time using a Kalman filter-based tracking system.
-- **Real-Time Animation**: Displays animated sensor fusion frames with bounding boxes and tracked object IDs.
-- **Trajectory Visualization**: Maintains and visualizes the 2D trajectory of each tracked object across frames.
-- **Pause and Play Controls**: User-friendly interactive animation controls.
-- **Animation & Image Export**: Saves animation as GIF and trajectory summary images for further analysis.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)  
+![Python](https://img.shields.io/badge/python-3.13-blue)  
+![OpenAI GPT](https://img.shields.io/badge/OpenAI-GPT--3.5--Turbo-green)  
+![Matplotlib](https://img.shields.io/badge/matplotlib-3.7-orange)  
 
 ---
 
-## Project Structure
+## 🚀 Project Overview
 
-```
+This advanced **Multisensor Fusion & Real-Time 3D Object Tracking** pipeline leverages the KITTI dataset's camera images, LiDAR point clouds, and labels to create a seamless, interactive visualization of dynamic traffic scenes.
 
+- **Robust sensor fusion** combining LiDAR depth and RGB camera images.
+- **Persistent object tracking** using a custom Kalman Filter-based multi-object tracker.
+- **Dynamic 3D bounding boxes** projected onto 2D images, color-coded per tracked ID.
+- **Natural language scene summaries** generated live via OpenAI GPT-3.5 Turbo — describing traffic behavior frame-by-frame.
+- **Rich visual outputs** including GIF animations of tracking and a detailed trajectory summary image.
+- Designed for **real-time performance** with downsampling and efficient data handling.
 
-├── animate\_fusion.py                      # Main script for animation and visualization
-├── kalman\_tracker.py                      # Multi-object Kalman filter tracking implementation
-├── 2011\_09\_26\_drive\_0001\_sync/        # KITTI dataset files (images, LIDAR)
-├── 2011\_09\_26/                           # KITTI calibration files
-├── label\_2/                               # KITTI label files for object detection
-├── README.md                               # This documentation file
+This project is a showcase of state-of-the-art robotics perception, sensor fusion, and AI-powered explanation — a perfect portfolio piece for roles in autonomous vehicles, robotics, and intelligent systems.
 
+---
+
+## 🎯 Key Features
+
+- **Multi-Modal Sensor Fusion:** Align and combine LiDAR point clouds with camera images using KITTI calibration data.
+- **3D Bounding Box Computation:** Accurate spatial representation of detected objects with rotation-aware 3D boxes.
+- **Kalman Filter Multi-Object Tracking:** Maintain consistent IDs over frames despite occlusion and noise.
+- **OpenAI GPT-3.5 Turbo Integration:** Contextual, concise scene summaries enhance interpretability and explainability.
+- **Intuitive Visualization:** Side-by-side matplotlib animation with pause/play controls and well-structured UI.
+- **Exportable Results:** Save high-quality GIF animations and trajectory summary snapshots for analysis and presentations.
+
+---
+
+## 📁 Project Structure
+
+```text
+.
+├── animate_fusion.py           # Main animation and visualization script
+├── kalman_tracker.py           # Custom Kalman filter multi-object tracking module
+├── README.md                   # This documentation file
+├── requirements.txt            # Python dependencies
+├── label_2/                   # KITTI label files for object annotations
+├── 2011_09_26_drive_0001_sync/ # KITTI dataset folder (images & LiDAR)
+└── calib/                     # KITTI calibration files
 ````
 
 ---
 
-## Getting Started
+## 🛠️ Installation & Setup
 
-### Prerequisites
+1. **Clone the repository**
 
-- Python 3.8+ (tested on Python 3.13)
-- Packages:
-  - numpy
-  - matplotlib
-  - opencv-python
-  - filterpy
+   ```bash
+   git clone https://github.com/yourusername/your-repo-name.git
+   cd your-repo-name
+   ```
 
-Install dependencies using pip:
+2. **Install Python 3.13 and dependencies**
 
-```bash
-pip install numpy matplotlib opencv-python filterpy
-````
+   Recommended to use a virtual environment:
 
-### Dataset Preparation
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-Download the relevant KITTI dataset sequences from [KITTI Vision Benchmark Suite](http://www.cvlibs.net/datasets/kitti/). Organize your folders as follows:
+3. **Download the KITTI Dataset**
 
-* Place synchronized LIDAR and image files in the `2011_09_26_drive_0001_sync` folder.
-* Place calibration files in the `2011_09_26` folder.
-* Place label files in the `label_2` folder.
+   * Download the required sequences from the official [KITTI Vision Benchmark Suite](http://www.cvlibs.net/datasets/kitti/).
+   * Organize the dataset in the folder structure as described above.
+   * Place calibration files in the `calib/` folder and labels in `label_2/`.
 
-Update the paths in `animate_fusion.py` accordingly if your folders are located elsewhere.
+4. **Set your OpenAI API Key as environment variable**
+
+   * On Windows PowerShell:
+
+     ```powershell
+     [Environment]::SetEnvironmentVariable("my_api_key", "your_actual_api_key_here", "User")
+     ```
+
+   * On Unix/macOS terminal:
+
+     ```bash
+     export my_api_key="your_actual_api_key_here"
+     ```
 
 ---
 
-## How to Run
+## 🚀 How to Run
 
-Run the main animation script:
+Simply execute the main animation script:
 
 ```bash
 python animate_fusion.py
 ```
 
-A window will open displaying fused camera images with projected LIDAR points, 3D bounding boxes, and tracked object IDs. Use the **Pause** button to stop/start animation.
-
-After closing the animation window, the program will automatically save:
-
-* `fusion_tracking.gif` — animated sensor fusion and tracking visualization.
-* `trajectory_summary.png` — snapshot image summarizing object trajectories.
+* Use the **Pause/Play** button to control the animation.
+* After closing the window, a GIF animation (`fusion_tracking.gif`) and a trajectory summary image (`trajectory_summary.png`) will be saved automatically.
+* Watch live 3D bounding boxes, tracked IDs, and dynamic GPT-generated scene summaries!
 
 ---
 
-## Key Components
+## 🧠 Technical Details
 
-### KalmanTracker & MultiObjectTracker
+* **Sensor Fusion Pipeline:**
+  Using KITTI's Velodyne-to-camera calibration matrices, the 3D LiDAR points are projected onto the 2D camera plane. Points are colored by intensity for intuitive depth perception.
 
-* Implements a Kalman filter-based tracking algorithm for 3D object tracking.
-* Associates detections to existing tracks using nearest-neighbor distance thresholding.
-* Creates new tracks for unmatched detections.
-* Maintains object IDs and trajectories over time.
+* **Tracking:**
+  A custom `MultiObjectTracker` class (Kalman filter based) maintains object identities and trajectories, handling frame-to-frame association robustly.
 
-### Sensor Fusion and Visualization
+* **3D Bounding Boxes:**
+  Object dimensions, locations, and yaw rotations from KITTI labels are used to compute accurate 3D box corners, projected into the image frame.
 
-* Projects 3D LIDAR points into the camera image frame using KITTI calibration.
-* Parses object detection labels to draw accurate 3D bounding boxes.
-* Uses OpenCV and Matplotlib for rendering images, points, and animations.
+* **Scene Summarization:**
+  The OpenAI GPT-3.5 Turbo model receives current tracked objects and outputs a concise human-readable summary of traffic flow and object states, updated every frame.
 
----
-
-## Future Work
-
-* **LLM Integration**: Add automated event summarization and anomaly reasoning using large language models.
-* **Improved Data Association**: Use advanced algorithms like Hungarian or IoU-based matching.
-* **Real-Time Performance Optimization**: Enhance efficiency for deployment on embedded systems.
-* **Extended Object Types**: Support additional object classes and multi-sensor modalities.
-* **User Interface Enhancements**: Add controls for frame navigation, object filtering, and detailed track inspection.
+* **Visualization:**
+  Built with matplotlib’s `FuncAnimation` and interactive widgets for user-friendly control.
 
 ---
 
-## License
+## 📈 Results
 
-This project is released under the MIT License.
+### Trajectory Summary Image
+
+![Trajectory Summary](trajectory_summary.png)
+
+*Displays all tracked object trajectories and IDs over the last frame.*
+
+### Real-Time Animated GIF
+
+![Fusion Tracking GIF](fusion_tracking.gif)
+
+*Captures the live tracking and sensor fusion animation.*
+
+---
+
+## 🔮 Future Work
+
+* Incorporate **multi-class object detection** to refine tracking accuracy.
+* Add **real-time alerting** on anomaly detection or object behavior changes.
+* Extend to **multi-camera setups** for full 360° environment perception.
+* Integrate **deep learning-based perception models** for enhanced robustness.
 
 ---
 
-## Acknowledgments
+## 🤝 Contributions
 
-* KITTI Vision Benchmark Suite for dataset and calibration files.
-* FilterPy for Kalman filter implementation.
-* OpenCV and Matplotlib communities for visualization tools.
+Contributions, bug reports, and feature requests are welcome! Please open an issue or submit a pull request.
 
 ---
 
-## Author
+## 📜 License
 
-**Koutilya Ganapathiraju**  
-Machine Learning Engineer | Robotics Enthusiast  
-https://github.com/GKoutilya | www.linkedin.com/in/koutilya-ganapathiraju-0a3350182 | gkoutilyaraju@gmail.com  
-
-Passionate about building cutting-edge perception and tracking systems for robotics and autonomous vehicles. Always eager to explore new AI techniques and share knowledge with the community.
-
-For questions or suggestions, feel free to reach out.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
+
+## 🙋‍♂️ About Me
+
+I am passionate about robotics, autonomous vehicles, and AI-powered perception systems. This project reflects my deep expertise in sensor fusion, tracking algorithms, and LLM integration for explainability.
+
+**Contact Me:**  
+- GitHub: [GitHub](https://github.com/GKoutilya)  
+- LinkedIn: [LinkedIn](www.linkedin.com/in/koutilya-ganapathiraju-0a3350182)  
+- Email: gkoutilyaraju@gmail.com
+
+Feel free to reach out if you want to discuss collaborations or technical questions!
+
+---
+
+# Thank you for checking out my project! 🚗🤖✨
