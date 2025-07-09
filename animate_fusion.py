@@ -1,3 +1,13 @@
+"""
+    This file:
+        Loads camera images, LIDAR point clouds, and 3D labels
+        Fuses them together into one animation
+        Draws 3D bounding boxes + LIDAR points
+        Tracks objects as they move over time
+        Describes the scene using GPT-3.5
+        Saves a GIF and a final scene summary image
+    Shows what the car "saw" in 3D with real-time descriptions
+"""
 import os
 import cv2
 import openai
@@ -12,14 +22,14 @@ from kalman_tracker import MultiObjectTracker
 # Set OpenAI API key from environment variable
 openai.api_key = os.getenv("my_api_key")
 
-# ========== CONFIGURATION ==========
+# Sets the paths to the KITTI data folders
 dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26_drive_0001_sync'
 calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26'
-
 image_folder = os.path.join(dataset_path, 'image_02', 'data')
 lidar_folder = os.path.join(dataset_path, 'velodyne_points', 'data')
 label_folder = os.path.join(os.path.dirname(__file__), 'label_2')
 
+# These are global constants
 NUM_FRAMES = 25
 LIDAR_DOWNSAMPLE = 5
 POINT_SIZE = 1.5
@@ -49,7 +59,7 @@ def read_calib_file(filepath):
 
 def load_calibration():
     """
-    Load KITTI calibration matrices needed for sensor fusion.
+    Load KITTI calibration matrices to project 3D LIDAR points into the 2D camera image.
 
     Returns:
         tuple: (Tr_velo_to_cam, R_rect, P2) matrices as numpy arrays.
@@ -72,7 +82,8 @@ def load_calibration():
 
 def project_lidar_to_image(scan, Tr_velo_to_cam, R_rect, P2, color_by='depth'):
     """
-    Project 3D LiDAR points into 2D camera image plane with color mapping.
+    Project 3D LIDAR points into 2D camera image plane with color mapping.
+    Converts the 3D LIDAR points into 3D camera coordinates. Can color them based on depth or intensity.
 
     Args:
         scan (np.ndarray): LiDAR points (N x 4) with intensity in 4th column.
@@ -103,7 +114,7 @@ def project_lidar_to_image(scan, Tr_velo_to_cam, R_rect, P2, color_by='depth'):
 
 def parse_label_file(label_path):
     """
-    Parse KITTI label file into list of object dicts.
+    Parse KITTI label file and read what objects were detected in the frame: type, 3D box size, position, etc.
 
     Args:
         label_path (str): Path to KITTI label txt file.
@@ -178,8 +189,8 @@ def project_to_image(pts_3d, P):
 
 def generate_scene_summary(objects, tracked):
     """
-    Generate a concise natural language summary of the current traffic scene
-    using OpenAI GPT based on detected objects and tracked IDs.
+    Generate a concise, one-sentence natural language summary of the current traffic scene
+    using OpenAI GPT (GPT-3.5) based on detected objects and tracked IDs.
 
     Args:
         objects (list of dict): Detected objects with types and locations.
@@ -221,6 +232,14 @@ def generate_scene_summary(objects, tracked):
 class FusionAnimator:
     """Main class responsible for fusing KITTI data streams and animating the visualization.
 
+        Loads all image, LIDAR, and label files
+        Prepares a plot window (image + GPT text area)
+        Draws LIDAR points on top of the camera image
+        Draws bounding boxes
+        Tracks objects with Kalman filters
+        Calls GPT every frame
+        Animates the whole sequence
+
     Attributes:
         num_frames (int): Total number of frames to animate.
         tracker (MultiObjectTracker): Kalman-based object tracker.
@@ -240,7 +259,11 @@ class FusionAnimator:
     """
 
     def __init__(self, num_frames=NUM_FRAMES):
-        """Initializes the FusionAnimator and sets up matplotlib and data paths."""
+        """
+            Initializes the FusionAnimator and sets up matplotlib and data paths.
+            Sets up all data and plot elements.
+            Gets calibration ready, loads image/label/LIDAR file paths, sets up plot windows, creates pause button, & starts with animation
+        """
         self.num_frames = num_frames
         self.Tr_velo_to_cam, self.R_rect, self.P2 = load_calibration()
         self.tracker = MultiObjectTracker()
@@ -289,7 +312,18 @@ class FusionAnimator:
         return self.colors[track_id]
 
     def update(self, frame_idx):
-        """Update function for animation; processes a single frame.
+        """
+        Update function for animation; processes a single frame.
+
+            Loads the image
+            Loads the LIDAR
+            Projects LIDAR onto image
+            Parses labels
+            Tracks objects (Kalman filters)
+            Draws 3D bounding boxes
+            Shows velocity & ID
+            Draws motion trajectory
+            Calls GPT to describe what's happening
 
         Args:
             frame_idx (int): Index of current frame.
@@ -380,7 +414,7 @@ class FusionAnimator:
     def save_animation(self, filename='fusion_tracking.gif'):
         """Save full animation as GIF file."""
         print(f"Saving animation to {filename} ...")
-        self.anim.save(filename, writer='pillow', fps=5)
+        self.anim.save(filename, writer='pillow', fps=7)
         print("Animation saved.")
 
 def summarize_scene_delta(final_summary_prompt):
