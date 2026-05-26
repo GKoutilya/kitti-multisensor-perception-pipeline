@@ -23,8 +23,8 @@ from kalman_tracker import MultiObjectTracker
 openai.api_key = os.getenv("my_api_key")
 
 # Sets the paths to the KITTI data folders
-dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26_drive_0001_sync'
-calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26'
+dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Using KITTI Dataset\2011_09_26_drive_0001_sync'
+calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Using KITTI Dataset\2011_09_26'
 image_folder = os.path.join(dataset_path, 'image_02', 'data')
 lidar_folder = os.path.join(dataset_path, 'velodyne_points', 'data')
 label_folder = os.path.join(os.path.dirname(__file__), 'label_2')
@@ -103,7 +103,9 @@ def project_lidar_to_image(scan, Tr_velo_to_cam, R_rect, P2, color_by='depth'):
     lidar_hom = np.hstack((scan[:, :3], np.ones((scan.shape[0], 1))))
     pts_cam = (Tr_velo_to_cam @ lidar_hom.T).T
     pts_rect = (R_rect @ pts_cam.T).T
-    pts_rect = pts_rect[pts_rect[:, 2] > 0]
+    depth_mask = pts_rect[:, 2] > 0
+    pts_rect = pts_rect[depth_mask]
+    scan = scan[depth_mask]
 
     pts_2d = (P2 @ pts_rect.T).T
     pts_2d = pts_2d[:, :2] / pts_2d[:, 2, np.newaxis]
@@ -357,7 +359,6 @@ class FusionAnimator:
             self.trajectories.setdefault(track_id, []).append(pos_2d)
             self.get_color(track_id)
 
-        self.img_display.set_data(img_rgb)
         self.scatter.set_offsets(pts_2d)
         self.scatter.set_array(colors)
 
@@ -375,13 +376,16 @@ class FusionAnimator:
             cv2.putText(img_rgb, f'ID {track.track_id}', (x_min, max(y_min - 10, 15)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
 
-            if len(self.trajectories[track.track_id]) > 1:
+            pts_proj = project_to_image(np.array([track.get_state()[:3]]), self.P2)
+            pos_2d = (int(pts_proj[0, 0]), int(pts_proj[0, 1]))
+
+            if len(self.trajectories.get(track.track_id, [])) > 1:
                 start_pt = tuple(self.trajectories[track.track_id][-2])
                 end_pt = pos_2d
                 cv2.arrowedLine(img_rgb, start_pt, end_pt,
                                 self.get_color(track.track_id), 2, tipLength=0.3)
 
-            velocity = np.linalg.norm(track.get_state()[3:6])
+            velocity = np.linalg.norm(track.get_velocity())
             cv2.putText(img_rgb, f'v={velocity:.1f} m/s', (x_min, y_min + 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
 

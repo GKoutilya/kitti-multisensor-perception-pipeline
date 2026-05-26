@@ -22,7 +22,7 @@ class KalmanTracker:
         self.kf = self._init_kalman_filter(init_position)
         self.age = 1
         self.time_since_update = 0
-        self.history = []
+        self.history = [np.array(init_position).flatten()]
     
     # State vector: 6D [x, y, z, vx, vy, vz], Measurement vector: 3D [x, y, z]
     def _init_kalman_filter(self, init_position):
@@ -65,9 +65,13 @@ class KalmanTracker:
         """
         self.kf.update(np.array(measurement).reshape(3, 1))
         self.time_since_update = 0
+        self.history.append(self.kf.x[:3].flatten())
 
     def get_state(self):
         return self.kf.x[:3].flatten()
+
+    def get_velocity(self):
+        return self.kf.x[3:6].flatten()
 
     def get_trajectory(self):
         """
@@ -100,6 +104,9 @@ class MultiObjectTracker:
                 Are still tracking something
                 Have a valid ID (were actually matched or initialized) 
         """
+        for track in self.tracks:
+            track.predict()
+
         updated_tracks = []
         # For each new detection:
         for det in detections:

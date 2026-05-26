@@ -4,8 +4,8 @@ import numpy as np # Handles matrix math (transformations, 3D geometry, & projec
 import matplotlib.pyplot as plt # Displays final results
 
 # Paths
-dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26_drive_0001_sync'
-calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Useing KITTI Dataset\2011_09_26'
+dataset_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Using KITTI Dataset\2011_09_26_drive_0001_sync'
+calib_path = r'C:\Users\kouti\Python\(5) Multisensor Fusion & Real-Time 3D Object Tracking Perception Pipeline Using KITTI Dataset\2011_09_26'
 
 image_folder = os.path.join(dataset_path, 'image_02', 'data')
 label_folder = os.path.join(os.path.dirname(__file__), 'label_2')
@@ -153,14 +153,16 @@ def main():
 
     # Frame index to visualize
     frame_idx = 0
-    image_file = sorted(os.listdir(image_folder))[frame_idx]
-    label_file = sorted(os.listdir(label_folder))[frame_idx]
+    image_file = sorted(f for f in os.listdir(image_folder) if f.endswith('.png'))[frame_idx]
+    label_file = sorted(f for f in os.listdir(label_folder) if f.endswith('.txt'))[frame_idx]
 
     # Loads one image and corresponding label file
     img_path = os.path.join(image_folder, image_file)
     lbl_path = os.path.join(label_folder, label_file)
 
     img = cv2.imread(img_path)
+    if img is None:
+        raise FileNotFoundError(f"Could not read image: {img_path}")
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     objects = parse_label_file(lbl_path)
