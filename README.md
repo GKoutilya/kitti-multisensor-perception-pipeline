@@ -168,7 +168,7 @@ These values are conservative trade-offs: 0.7 is permissive enough for the embed
 
 ### Ground Truth Labels
 
-This pipeline uses KITTI's ground truth annotation files rather than a real-time object detector. This means detection quality is perfect by design — no false positives, no missed detections. In a production system, detections would come from a model like YOLOv8 or PointPillars, introducing noise that would make the Mahalanobis gating and appearance matching more critical. The architecture is designed to handle this; only the data source would change.
+This pipeline uses KITTI's ground truth annotation files rather than a real-time object detector. This means detection quality is perfect by design with no false positives and no missed detections. In a production system, detections would come from a model like YOLOv8 or PointPillars, introducing noise that would make the Mahalanobis gating and appearance matching more critical. The architecture is designed to handle this; only the data source would change.
 
 ---
 
