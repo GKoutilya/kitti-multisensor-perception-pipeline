@@ -15,4 +15,14 @@ class NearestNeighborGallery:
     def delete(self, track_id):
         self.gallery.pop(track_id, None)
 
-    
+    def cost_matrix(self, embeddings, track_ids):
+        n = embeddings.shape[0]
+        m = len(track_ids)
+        cost = np.full((n,m), 1.0, dtype=np.float32)
+        for j, tid in enumerate(track_ids):
+            if tid not in self.gallery or not self.gallery[tid]:
+                continue
+            G = np.array(self.gallery[tid])
+            dots = embeddings @ G.T
+            cost[:, j] = 1.0 - np.max(dots, axis=1)
+        return cost

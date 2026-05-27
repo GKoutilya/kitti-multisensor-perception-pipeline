@@ -18,6 +18,7 @@ from matplotlib import colormaps
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
 from kalman_tracker import MultiObjectTracker
+from deep_sort.embedder import AppearanceEmbedder
 
 # Set OpenAI API key from environment variable
 openai.api_key = os.getenv("my_api_key")
@@ -269,6 +270,7 @@ class FusionAnimator:
         self.num_frames = num_frames
         self.Tr_velo_to_cam, self.R_rect, self.P2 = load_calibration()
         self.tracker = MultiObjectTracker()
+        self.embedder = AppearanceEmbedder()
 
         self.image_files = sorted([f for f in os.listdir(image_folder) if f.endswith('.png')])[:self.num_frames]
         self.lidar_files = sorted([f for f in os.listdir(lidar_folder) if f.endswith('.bin')])[:self.num_frames]
@@ -345,25 +347,28 @@ class FusionAnimator:
         objects = parse_label_file(label_path)
 
         centroids = [obj['location'] for obj in objects]
-        tracked = self.tracker.update(centroids)
+        bboxes = [obj['bbox'] for obj in objects]
+        embeddings = self.embedder.embed(img_rgb, bboxes)
+
+        tracked = self.tracker.update(centroids, embeddings)
 
         for track in tracked:
-            track_id = track.track_id
-            state = track.get_state()
-            if state is None:
-                continue
-
-            pos_3d = state[:3]
+            pos_3d = track.get_state()
             pts_proj = project_to_image(np.array([pos_3d]), self.P2)
             pos_2d = (int(pts_proj[0, 0]), int(pts_proj[0, 1]))
-            self.trajectories.setdefault(track_id, []).append(pos_2d)
-            self.get_color(track_id)
+            self.trajectories.setdefault(track.track_id, []).append(pos_2d)
+            self.get_color(track.track_id)
 
         self.scatter.set_offsets(pts_2d)
         self.scatter.set_array(colors)
 
-        for obj, track in zip(objects, tracked):
-            corners_3d = compute_3d_box(obj['dimensions'], obj['location'], obj['rotation_y'])
+        for track in tracked:
+            track_pos = track.get_state()
+            if not objects:
+                continue
+            closest_obj = min(objects, key=lambda o: np.linalg.norm(np.array(o['location']) - track_pos))
+
+            corners_3d = compute_3d_box(closest_obj['dimensions'], closest_obj['location'], closest_obj['rotation_y'])
             pts_box = project_to_image(corners_3d, self.P2).astype(int)
             for i, j in zip([0,1,2,3], [1,2,3,0]):
                 cv2.line(img_rgb, tuple(pts_box[i]), tuple(pts_box[j]), self.get_color(track.track_id), 2)
@@ -376,20 +381,19 @@ class FusionAnimator:
             cv2.putText(img_rgb, f'ID {track.track_id}', (x_min, max(y_min - 10, 15)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
 
-            pts_proj = project_to_image(np.array([track.get_state()[:3]]), self.P2)
+            pts_proj = project_to_image(np.array([track_pos]), self.P2)
             pos_2d = (int(pts_proj[0, 0]), int(pts_proj[0, 1]))
 
             if len(self.trajectories.get(track.track_id, [])) > 1:
                 start_pt = tuple(self.trajectories[track.track_id][-2])
-                end_pt = pos_2d
-                cv2.arrowedLine(img_rgb, start_pt, end_pt,
+                cv2.arrowedLine(img_rgb, start_pt, pos_2d,
                                 self.get_color(track.track_id), 2, tipLength=0.3)
 
             velocity = np.linalg.norm(track.get_velocity())
             cv2.putText(img_rgb, f'v={velocity:.1f} m/s', (x_min, y_min + 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.get_color(track.track_id), 2, cv2.LINE_AA)
 
-            final_summary_prompt.append((track.track_id, track.get_state()))
+            final_summary_prompt.append((track.track_id, track.get_state(), track.get_velocity()))
 
         self.img_display.set_data(img_rgb)
         summary = generate_scene_summary(objects, tracked)
@@ -425,8 +429,8 @@ def summarize_scene_delta(final_summary_prompt):
     """Generate a final GPT summary describing how the scene evolved over time."""
     if not final_summary_prompt:
         return
-    lines = [f"- ID {tid}: ended at ({state[0]:.1f}, {state[1]:.1f}, {state[2]:.1f}) with v={np.linalg.norm(state[3:6]):.1f} m/s"
-             for tid, state in final_summary_prompt]
+    lines = [f"- ID {tid}: ended at ({state[0]:.1f}, {state[1]:.1f}, {state[2]:.1f}) with v={np.linalg.norm(vel):.1f} m/s"
+             for tid, state, vel in final_summary_prompt]
     prompt = "Summarize how the scene evolved over the animation:\n" + "\n".join(lines)
     try:
         response = openai.chat.completions.create(

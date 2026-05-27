@@ -1,12 +1,11 @@
 import numpy as np
+from scipy.optimize import linear_sum_assignment # Hungarian Algorithm Implementation
 from filterpy.kalman import KalmanFilter
-
+from deep_sort.nn_matching import NearestNeighborGallery
 """
     Used when you need to track objects that move over time, not just detecting them once.
     Kalman filters make smart guesses that keep estimating where things are.
 """
-
-
 """
     We create a tracker for each object we find in 3D space.
     The tracker keeps track of:
@@ -15,6 +14,12 @@ from filterpy.kalman import KalmanFilter
         Where it'll be next
     Each tracker gets a unique ID
 """
+
+CHI2_THRESHOLD = 7.815
+MAX_AGE = 30
+MIN_HITS = 2
+MAX_COSINE_DISTANCE = 0.7
+
 class KalmanTracker:
     # Stores track_id and initializes a Kalman filter and metadata (age, update time, history)
     def __init__(self, init_position, obj_id):
@@ -23,6 +28,8 @@ class KalmanTracker:
         self.age = 1
         self.time_since_update = 0
         self.history = [np.array(init_position).flatten()]
+        self.hits = 1
+        self.state = 'tentative'
     
     # State vector: 6D [x, y, z, vx, vy, vz], Measurement vector: 3D [x, y, z]
     def _init_kalman_filter(self, init_position):
@@ -66,21 +73,36 @@ class KalmanTracker:
         self.kf.update(np.array(measurement).reshape(3, 1))
         self.time_since_update = 0
         self.history.append(self.kf.x[:3].flatten())
+        self.hits += 1
+        if self.state == 'tentative' and self.hits >= MIN_HITS:
+            self.state = 'confirmed'
 
-    def get_state(self):
-        return self.kf.x[:3].flatten()
+    def mark_missed(self):
+        if self.state == 'tentative':
+            self.state = 'deleted'
+        elif self.time_since_update > MAX_AGE:
+            self.state = 'deleted'
 
-    def get_velocity(self):
-        return self.kf.x[3:6].flatten()
+    def mahalanobis_distance(self, detection):
+        z = np.array(detection).reshape(3, 1)
+        H = self.kf.H
+        P = self.kf.P
+        R = self.kf.R
+        S = H @ P @ H.T + R
+        innov = z - self.kf.x[:3]
+        return float(innov.T @ np.linalg.inv(S) @ innov)
 
-    def get_trajectory(self):
-        """
-        Get the history of tracked positions.
+    def get_state(self): return self.kf.x[:3].flatten()
 
-        Returns:
-            list of np.ndarray: Past [x, y, z] positions.
-        """
-        return self.history
+    def get_velocity(self): return self.kf.x[3:6].flatten()
+
+    def get_trajectory(self): return self.history
+
+    def is_tentative(self): return self.state == 'tentative'
+
+    def is_confirmed(self): return self.state == 'confirmed'
+
+    def is_deleted(self): return self.state == 'deleted'
 
 
 class MultiObjectTracker:
@@ -93,52 +115,109 @@ class MultiObjectTracker:
         This is how it handles multiple moving objects all at once, like cars and people.
     """
     # Stores active tracks and a counter for assigning new IDs
-    def __init__(self):
+    def __init__(self, max_cosine_distance=MAX_COSINE_DISTANCE, nn_budget=100):
         self.tracks = []
         self.next_id = 0
+        self.gallery = NearestNeighborGallery(max_gallery_size=nn_budget)
+        self.max_cosine_distance = max_cosine_distance
 
-    def update(self, detections):
-        """
-           We only keep the trackers that are active and useful.
-           Only return trackers that:
-                Are still tracking something
-                Have a valid ID (were actually matched or initialized) 
-        """
+    def update(self, detections, embeddings):
+        # 1. Predict all tracks forward
         for track in self.tracks:
             track.predict()
 
-        updated_tracks = []
-        # For each new detection:
-        for det in detections:
-            det = np.array(det)
+        confirmed = [t for t in self.tracks if t.is_confirmed()]
+        tentative = [t for t in self.tracks if t.is_tentative()]
 
-            # Match with existing tracks (simple nearest neighbor)
-            # Tries to find the nearest track (Euclidean distance)
-            # If there's a match within 3.0 meters, it updates the track
-            # If there's no match, it initializes a new track
-            best_track = None
-            best_dist = float('inf')
-            for track in self.tracks:
-                pred = track.get_state()
-                if pred is None:
-                    continue
-                dist = np.linalg.norm(pred - det)
-                if dist < best_dist and dist < 3.0:  # distance threshold
-                    best_dist = dist
-                    best_track = track
+        # 2. Cascade match detections against confirmed tracks
+        matches, unmatched_dets, _ = self._cascade_match(detections, embeddings, confirmed)
 
-            if best_track:
-                best_track.update(det)
-                updated_tracks.append(best_track)
-                self.tracks.remove(best_track)
+        # 3. Distance match leftover detections against tentative tracks
+        leftover_positions = [detections[i] for i in unmatched_dets]
+        tent_matches, unmatched_dets, _ = self._distance_match(leftover_positions, tentative, unmatched_dets)
+        matches += tent_matches
+
+        # 4. Update matched tracks
+        for det_idx, track in matches:
+            track.update(detections[det_idx])
+            self.gallery.update(track.track_id, embeddings[det_idx])
+
+        # 5. Mark unmatched tracks as missed
+        matched_tracks = {track for _, track in matches}
+        for track in self.tracks:
+            if track not in matched_tracks:
+                track.mark_missed()
+
+        # 6. Spawn new tracks for unmatched detections, delete dead tracks
+        for det_idx in unmatched_dets:
+            new_track = KalmanTracker(detections[det_idx], self.next_id)
+            self.gallery.update(self.next_id, embeddings[det_idx])
+            self.tracks.append(new_track)
+            self.next_id += 1
+
+        for track in [t for t in self.tracks if t.is_deleted()]:
+            self.gallery.delete(track.track_id)
+        self.tracks = [t for t in self.tracks if not t.is_deleted()]
+
+        return [t for t in self.tracks if t.is_confirmed()]
+    
+    def _cascade_match(self, detections, embeddings, confirmed_tracks):
+        if not confirmed_tracks or not detections:
+            return [], list(range(len(detections))), confirmed_tracks
+        
+        track_ids = [t.track_id for t in confirmed_tracks]
+
+        # Appearance cost matrix from the gallery
+        app_cost = self.gallery.cost_matrix(embeddings, track_ids)
+
+        # Mahalanobis gating - mask implausible pairs
+        for j, track in enumerate(confirmed_tracks):
+            for i, det in enumerate(detections):
+                if track.mahalanobis_distance(det) > CHI2_THRESHOLD:
+                    app_cost[i, j] = 1.0
+        
+        # Appearance gate - mask dissimilar pairs
+        app_cost[app_cost > self.max_cosine_distance] = 1.0
+
+        # Hungarain Assignment
+        row_inds, col_inds = linear_sum_assignment(app_cost)
+
+        matches, unmatched_dets, unmatched_tracks = [], [], []
+        matched_cols = set()
+
+        for r, c in zip(row_inds, col_inds):
+            if app_cost[r, c] >= 1.0: # gated pair, treat as unmatched
+                unmatched_dets.append(r)
             else:
-                # Create new track
-                new_track = KalmanTracker(det, self.next_id)
-                updated_tracks.append(new_track)
-                self.next_id += 1
+                matches.append((r, confirmed_tracks[c]))
+                matched_cols.add(c)
 
-        # Only matched or new tracks are kept
-        self.tracks = updated_tracks
+        matched_rows = {r for r, _ in matches}
+        for i in range(len(detections)):
+            if i not in matched_rows and i not in unmatched_dets:
+                unmatched_dets.append(i)
+        for j, track in enumerate(confirmed_tracks):
+            if j not in matched_cols:
+                unmatched_tracks.append(track)
 
-        # Return only tracks with valid track_id attribute
-        return [t for t in self.tracks if hasattr(t, "track_id")]
+        return matches, unmatched_dets, unmatched_tracks
+    
+    def _distance_match(self, det_positions, tentative_tracks, original_indices):
+        if not tentative_tracks or not det_positions:
+            return [], original_indices, tentative_tracks
+        
+        matches, unmatched = [], list(original_indices)
+        for track in tentative_tracks:
+            pred = track.get_state()
+            best_idx, best_dist = None, float('inf')
+            for orig_idx, det in zip(original_indices, det_positions):
+                if orig_idx not in unmatched:
+                    continue
+                dist = np.linalg.norm(pred - np.array(det))
+                if dist < best_dist and dist < 3.0:
+                    best_dist, best_idx = dist, orig_idx
+            if best_idx is not None:
+                matches.append((best_idx, track))
+                unmatched.remove(best_idx)
+
+        return matches, unmatched, tentative_tracks
