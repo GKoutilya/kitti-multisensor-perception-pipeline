@@ -13,7 +13,7 @@
 This **Multisensor Fusion & Real-Time 3D Object Tracking** pipeline leverages the KITTI dataset's camera images, LiDAR point clouds, and ground truth labels to create an interactive visualization of dynamic traffic scenes.
 
 - **Robust sensor fusion** combining LiDAR depth and RGB camera images.
-- **Persistent object tracking** using a DeepSORT algorithm — a Kalman Filter paired with a CNN appearance embedder and Hungarian algorithm data association.
+- **Persistent object tracking** using a DeepSORT algorithm: a Kalman Filter paired with a CNN appearance embedder and Hungarian algorithm data association.
 - **Dynamic 3D bounding boxes** projected onto 2D images, color-coded per tracked ID.
 - **Natural language scene summaries** generated live via OpenAI GPT-3.5 Turbo.
 - **Directional trajectory arrows** that visualize object motion between frames.
@@ -114,7 +114,7 @@ KITTI provides three calibration matrices that chain together to project LiDAR p
 - **`R_rect`** — rectification matrix correcting stereo camera misalignment
 - **`P2`** — camera projection matrix (intrinsics) mapping 3D to 2D pixels
 
-LiDAR points are downsampled, filtered to the camera's field of view, projected, and rendered as a colored scatter plot over the camera image — colored by intensity.
+LiDAR points are downsampled, filtered to the camera's field of view, projected, and rendered as a colored scatter plot over the camera image, colored by intensity.
 
 ### DeepSORT Tracking
 
@@ -133,7 +133,7 @@ A pretrained **MobileNetV2** backbone (ImageNet weights) with the classifier hea
 
 ### Appearance Gallery (`deep_sort/nn_matching.py`)
 
-Each track stores its last 100 embeddings. The cost matrix entry for a detection-track pair is `1 - max_k(dot(detection, gallery[k]))` — the best appearance match anywhere in the track's history.
+Each track stores its last 100 embeddings. The cost matrix entry for a detection-track pair is `1 - max_k(dot(detection, gallery[k]))` which is the best appearance match anywhere in the track's history.
 
 ### Track State Management
 
@@ -151,9 +151,9 @@ Each track stores its last 100 embeddings. The cost matrix entry for a detection
 
 The appearance embedder uses **MobileNetV2 pretrained on ImageNet** rather than a dedicated ReID backbone (e.g. OSNet trained on Market-1501 or VeRi-776). This was a deliberate engineering decision driven by two constraints:
 
-**1. Platform:** `torchreid` — the standard library for pretrained ReID models — is not available on PyPI and requires a manual build process that is unreliable on Windows. MobileNetV2 is available directly from `torchvision`, which is already a required dependency, eliminating any additional install complexity.
+**1. Platform:** `torchreid` (the standard library for pretrained ReID models) is not available on PyPI and requires a manual build process that is unreliable on Windows. MobileNetV2 is available directly from `torchvision`, which is already a required dependency, eliminating any additional install complexity.
 
-**2. Dataset mismatch:** The most commonly available pretrained ReID backbones are trained on *pedestrian* datasets (Market-1501, DukeMTMC). This project tracks *vehicles*. A pedestrian-trained ReID model is not meaningfully better than a general ImageNet backbone for vehicle re-identification — both are out-of-distribution. The correct solution would be a model trained on a vehicle ReID dataset such as VeRi-776 or VehicleID, which are not easily available as pretrained weights.
+**2. Dataset mismatch:** The most commonly available pretrained ReID backbones are trained on *pedestrian* datasets (Market-1501, DukeMTMC). This project tracks *vehicles*. A pedestrian-trained ReID model is not meaningfully better than a general ImageNet backbone for vehicle re-identification because both are out-of-distribution. The correct solution would be a model trained on a vehicle ReID dataset such as VeRi-776 or VehicleID, which are not easily available as pretrained weights.
 
 ### Threshold Tuning
 
@@ -206,7 +206,7 @@ Contributions, bug reports, and feature requests are welcome. Please open an iss
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
