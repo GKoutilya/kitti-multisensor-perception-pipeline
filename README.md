@@ -212,7 +212,7 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ## About Me
 
-I am passionate about robotics, autonomous vehicles, and AI-powered perception systems. This project reflects my work in sensor fusion, multi-object tracking, and LLM integration for explainability.
+My name is Koutilya Ganapathiraju. I am currently a student at Texas A&M University - College Station, studying Mathematics. For some time now, I have been passionate about robotics, autonomous vehicles, and AI-powered perception systems. This project reflects my work in sensor fusion, multi-object tracking, and LLM integration for explainability. Feel free to contact me.
 
 **Contact:**  
 - [GitHub](https://github.com/GKoutilya)  
